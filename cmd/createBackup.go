@@ -16,8 +16,10 @@ import (
 )
 
 type BackupConfig struct {
-	FolderSource      []string `yaml:"folderSource"`
-	FolderDestination string `yaml:"folderDestination"`
+	BackupMap         []struct{
+		Source        string `yaml:"source"` 
+		Destination   string `yaml:"destination"` 
+	} `yaml:"backupMap"`
 }
 
 // createBackupCmd represents the create-backup command
@@ -36,7 +38,7 @@ var createBackupCmd = &cobra.Command{
 		}
 		defer file.Close()
 
-		fmt.Println("Config file found... Initializing")
+		log.Println("Config file found... Initializing")
 
 		decoder := yaml.NewDecoder(file)
 		err = decoder.Decode(&cfg)
@@ -45,38 +47,37 @@ var createBackupCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Printf("Output: %+v\n", cfg)
-		fmt.Printf("Destination: %v\n", cfg.FolderDestination)
+		for _, folderPair := range cfg.BackupMap {	
+			err = createBackup(folderPair.Source, folderPair.Destination)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 
-		fmt.Println("Saving to backup destination folder")
-		err = createBackup(cfg.FolderSource, cfg.FolderDestination)
-		if err != nil {
-			log.Fatal(err)
-		} 
+		log.Println("Backup successfully created.")
 	},
 }
 
-func createBackup(sourcePaths []string, destinationPath string) error {
+func createBackup(sourcePath string, destinationPath string) error {
 	var innerFolderName = "folder1"
+	fmt.Printf("Source path: %s\n", sourcePath)
 
 	// Creates new directory if it does not exist, otherwise do nothing
 	err := createDirectory(destinationPath)
 	if err != nil {
-		fmt.Println("here")
+		log.Printf("Error creating directory: %v\n", destinationPath)
 		return err
 	}
 
-	for _, folderPath := range sourcePaths {
-		_, err := os.Stat(folderPath) 	
-		if err != nil {
-			continue
-		}
-		//fmt.Printf("%v\n", folderPath)
+	_, err = os.Stat(sourcePath)	
+	if err != nil {
+		return err	
+	}
 
-		err = cp.Copy(folderPath, fmt.Sprintf("%s/%s", destinationPath, innerFolderName))
-		if err != nil {
-			return err
-		}
+	log.Printf("Creating backup files...")
+	err = cp.Copy(sourcePath, fmt.Sprintf("%s/%s", destinationPath, innerFolderName))
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -96,6 +97,7 @@ func createDirectory(path string) error {
 			return err
 		}
 
+		log.Printf("Directory %v does not exist. Creating directory...\n", path)
 		err = os.Mkdir(path, 0777)
 		if err != nil {
 			return err

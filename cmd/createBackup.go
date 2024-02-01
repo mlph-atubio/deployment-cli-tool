@@ -23,8 +23,11 @@ type BackupConfig struct {
 	} `yaml:"backupMap"`
 }
 
-var ConfigSource string
-var FolderName string
+var (
+	ConfigSource string
+	FolderName string
+)
+
 // createBackupCmd represents the create-backup command
 var createBackupCmd = &cobra.Command{
 	Use:   "create-backup",
@@ -32,6 +35,11 @@ var createBackupCmd = &cobra.Command{
 	Long: `Creates a backup in a folder specified in the config file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var cfg BackupConfig
+
+		if ConfigSource == "" {
+			log.Println("Config file not set in the flag. Checking current directory.")
+			ConfigSource = "./config.yml"
+		}
 		
 		file, err := os.Open(ConfigSource)
 		if err != nil {
@@ -76,8 +84,9 @@ func createBackup(sourcePath string, destinationPath string) error {
 		return err	
 	}
 
-	log.Printf("Creating backup files...")
-	err = cp.Copy(sourcePath, fmt.Sprintf("%s/%s", destinationPath, FolderName))
+	basePath := filepath.Base(sourcePath)
+	log.Printf("Creating backup for %s.\n", basePath)
+	err = cp.Copy(sourcePath, fmt.Sprintf("%s/%s/%s", destinationPath, FolderName, basePath))
 	if err != nil {
 		return err
 	}
